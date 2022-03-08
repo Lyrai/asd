@@ -1,4 +1,5 @@
 #include <iostream>
+#include <algorithm>
 #include "set.h"
 
 int main() {
@@ -11,6 +12,12 @@ int main() {
     s.insert(0);
     s.print();
     s.print_by_levels();
+    std::cout << std::endl;
+    auto i = std::find(s.begin(), s.end(), 2);
+    std::cout << *i << "\n\n";
+
+    auto c = std::count_if(s.begin(), s.end(), [](auto x) { return x % 2 == 0; });
+    std::cout << c << "\n\n";
 
     set<int> s1;
     s1.insert(1);

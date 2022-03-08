@@ -5,69 +5,110 @@
 #include <iostream>
 #include <queue>
 #include <stack>
+#include <cassert>
 
 template<class T>
 class set {
 private:
     class node;
-    node *m_root;
+    node *m_virtnode;
 
 public:
+    class iterator;
+
     set() {
-        m_root = nullptr;
+        m_virtnode = (node*)malloc(sizeof(node));
+        m_virtnode->m_parent = nullptr;
+        m_virtnode->m_left = nullptr;
+        m_virtnode->m_right = nullptr;
     }
 
-    void insert(T elem);
+    iterator lower_bound(T &elem);
+    iterator upper_bound(T &elem);
     void remove(T elem);
-    T find_min() {
-        return find_leftmost(m_root);
+    void insert(T elem);
+    void print_by_levels();
+
+    iterator begin() {
+        return iterator(m_virtnode->m_left, this);
     }
 
-    T find_max() {
-        return find_rightmost(m_root);
+    iterator end() {
+        return iterator(m_virtnode, this);
     }
 
-    node *find(T elem) {
-        return find(elem, m_root);
+    T min() {
+        return m_virtnode->m_left->m_data;
+    }
+
+    T max() {
+        return m_virtnode->m_right->m_data;
+    }
+
+    iterator find(T elem) {
+        auto e = find(elem, m_virtnode->m_parent);
+        return e ? iterator(e, this) : end();
     }
 
     void print() {
-        print(m_root);
+        print(m_virtnode->m_parent);
         std::cout << std::endl;
     }
 
-    void find_prev_and_next(node *elem, node *&prev, node *&next) {
-        prev = elem->m_left == nullptr ? nullptr : find_rightmost(elem->m_left);
-        next = elem->m_right == nullptr ? nullptr : find_leftmost(elem->m_right);
+    bool contains(T &elem) {
+        return find(elem, m_virtnode->m_parent) != nullptr;
     }
-
-    node* lower_bound(T elem) {
-        auto n = find(elem);
-        return n->m_left == nullptr ? nullptr : find_rightmost(n->m_left);
-    }
-
-    node* upper_bound(T elem) {
-        auto n = find(elem);
-        return n->m_right == nullptr ? nullptr : find_leftmost(n->m_right);
-    }
-
-    void print_by_levels();
 
     bool operator==(set<T> &other) {
         if(&other == this)
             return true;
 
-        return equals(m_root, other.m_root);
+        return equals(m_virtnode->m_parent, other.m_virtnode->m_parent);
     }
 
     bool operator!=(set<T> &other) {
         return !(*this == other);
     }
 
+public:
+    class iterator: public std::iterator<std::bidirectional_iterator_tag, T> {
+    private:
+        node *m_node;
+        set *m_set;
+
+    public:
+        iterator(node *n, set *s)
+            : m_node(n), m_set(s)
+        { }
+
+        iterator(iterator &iter)
+            : m_node(iter.m_node), m_set(iter.m_set)
+        { }
+
+        iterator(const iterator &iter)
+            : m_node(iter.m_node), m_set(iter.m_set)
+        { }
+
+        iterator operator++();
+        iterator operator--();
+        T operator*() const {
+            assert(m_node != m_set->m_virtnode);
+            return m_node->m_data;
+        }
+
+        bool operator==(const iterator &rhs) const {
+            return m_node == rhs.m_node;
+        }
+
+        bool operator!=(const iterator &rhs) const {
+            return m_node != rhs.m_node;
+        }
+    };
+
 private:
     void insert(T elem, node *root);
     void print(node *root) {
-        if(root == nullptr)
+        if(root == m_virtnode || root == nullptr)
             return;
 
         print(root->m_left);
@@ -97,10 +138,12 @@ private:
 
 template<class T>
 void set<T>::insert(T elem) {
-    if(m_root == nullptr)
-        m_root = new node(elem, nullptr);
-    else
-        insert(elem, m_root);
+    if(m_virtnode->m_parent == nullptr) {
+        m_virtnode->m_parent = new node(elem, nullptr);
+        m_virtnode->m_parent->m_right = m_virtnode;
+    } else {
+        insert(elem, m_virtnode->m_parent);
+    }
 }
 
 template<class T>
@@ -111,11 +154,17 @@ void set<T>::insert(T elem, set::node *root) {
     if(elem < root->m_data) {
         if(root->m_left == nullptr) {
             root->m_left = new node(elem, root);
+            m_virtnode->m_left = root->m_left;
         } else {
             insert(elem, root->m_left);
         }
     } else {
-        if(root->m_right == nullptr) {
+        if(root->m_right == m_virtnode) {
+            auto new_node = new node(elem, root);
+            root->m_right = new_node;
+            m_virtnode->m_right = new_node;
+            new_node->m_right = m_virtnode;
+        } else if(root->m_right == nullptr) {
             root->m_right = new node(elem, root);
         } else {
             insert(elem, root->m_right);
@@ -209,14 +258,14 @@ typename set<T>::node *set<T>::find_leftmost(set::node *n) {
 template<class T>
 void set<T>::print_by_levels() {
     std::queue<node*> q;
-    q.push(m_root);
+    q.push(m_virtnode->m_parent);
     while(!q.empty()) {
         auto n = q.front();
         q.pop();
         std::cout << n->m_data << " ";
         if(n->m_left != nullptr)
             q.push(n->m_left);
-        if(n->m_right != nullptr)
+        if(n->m_right != nullptr && n->m_right != m_virtnode)
             q.push(n->m_right);
     }
     std::cout << std::endl;
@@ -227,6 +276,9 @@ bool set<T>::equals(set::node *n1, set::node *n2) {
     if(n1 == nullptr && n2 == nullptr)
         return true;
 
+    if(n1 == m_virtnode && n2->m_right->m_parent != n2)
+        return true;
+
     if(n1 == nullptr || n2 == nullptr)
         return false;
 
@@ -235,6 +287,78 @@ bool set<T>::equals(set::node *n1, set::node *n2) {
     } else {
         return false;
     }
+}
+
+template<class T>
+typename set<T>::iterator set<T>::upper_bound(T &elem) {
+    auto iter = begin();
+    while(iter != end() && *iter <= elem)
+        ++iter;
+
+    return iter;
+}
+
+template<class T>
+typename set<T>::iterator set<T>::lower_bound(T &elem) {
+    auto iter = begin();
+    while(iter != end() && *iter < elem)
+        ++iter;
+
+    return iter;
+}
+
+template<class T>
+typename set<T>::iterator set<T>::iterator::operator++() {
+    assert(*this != m_set->end());
+    if(m_node->m_right == m_set->m_virtnode) {
+        m_node = m_node->m_right;
+        return *this;
+    }
+
+    if(m_node->m_right != nullptr) {
+        m_node = m_set->find_leftmost(m_node->m_right);
+        return *this;
+    }
+
+    auto par = m_node->m_parent;
+    while(par->m_left != m_node) {
+        if(par->m_parent == nullptr) {
+            par = par->m_right;
+            break;
+        }
+
+        par = par->m_parent;
+    }
+
+    m_node = par;
+    return *this;
+}
+
+template<class T>
+typename set<T>::iterator set<T>::iterator::operator--() {
+    assert(*this != m_set->begin());
+    if(m_node == m_set->m_virtnode) {
+        m_node = m_node->m_right;
+        return *this;
+    }
+
+    if(m_node->m_left != nullptr) {
+        m_node = m_set->find_rightmost(m_node->m_left);
+        return *this;
+    }
+
+    auto par = m_node->m_parent;
+    while(par->m_right != m_node) {
+        if(par->m_parent == nullptr) {
+            par = par->m_left;
+            break;
+        }
+
+        par = par->m_parent;
+    }
+
+    m_node = par;
+    return *this;
 }
 
 #endif //LAB3_SET_H
