@@ -41,10 +41,27 @@ public:
         next = elem->m_right == nullptr ? nullptr : find_leftmost(elem->m_right);
     }
 
+    node* lower_bound(T elem) {
+        auto n = find(elem);
+        return n->m_left == nullptr ? nullptr : find_rightmost(n->m_left);
+    }
+
+    node* upper_bound(T elem) {
+        auto n = find(elem);
+        return n->m_right == nullptr ? nullptr : find_leftmost(n->m_right);
+    }
+
     void print_by_levels();
 
     bool operator==(set<T> &other) {
+        if(&other == this)
+            return true;
+
         return equals(m_root, other.m_root);
+    }
+
+    bool operator!=(set<T> &other) {
+        return !(*this == other);
     }
 
 private:
