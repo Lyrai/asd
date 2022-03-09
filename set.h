@@ -139,7 +139,7 @@ private:
 template<class T>
 void set<T>::insert(T elem) {
     if(m_virtnode->m_parent == nullptr) {
-        m_virtnode->m_parent = new node(elem, nullptr);
+        m_virtnode->m_left = m_virtnode->m_right = m_virtnode->m_parent = new node(elem, nullptr);
         m_virtnode->m_parent->m_right = m_virtnode;
     } else {
         insert(elem, m_virtnode->m_parent);
@@ -154,7 +154,8 @@ void set<T>::insert(T elem, set::node *root) {
     if(elem < root->m_data) {
         if(root->m_left == nullptr) {
             root->m_left = new node(elem, root);
-            m_virtnode->m_left = root->m_left;
+            if(root == m_virtnode->m_left)
+                m_virtnode->m_left = root->m_left;
         } else {
             insert(elem, root->m_left);
         }
@@ -194,11 +195,11 @@ typename set<T>::node* set<T>::find(T &elem, node *root) {
 
 template<class T>
 void set<T>::remove(T elem) {
-    auto n = find(elem);
+    auto n = find(elem, m_virtnode->m_parent);
     if(n == nullptr)
         return;
 
-    if(n->m_left == nullptr && n->m_right == nullptr) {
+    if(n->m_left == nullptr && (n->m_right == nullptr || n->m_right == m_virtnode)) {
         remove_leaf(n);
         return;
     }
@@ -210,6 +211,12 @@ template<class T>
 void set<T>::remove_leaf(set::node *leaf) {
     if(leaf->m_parent->m_left == leaf) {
         leaf->m_parent->m_left = nullptr;
+
+        if(m_virtnode->m_left == leaf)
+            m_virtnode->m_left = leaf->m_parent;
+    } else if(leaf->m_right == m_virtnode) {
+        leaf->m_parent->m_right = m_virtnode;
+        m_virtnode->m_right = leaf->m_parent;
     } else {
         leaf->m_parent->m_right = nullptr;
     }
@@ -229,6 +236,9 @@ void set<T>::remove_general(set::node *n) {
     std::swap(n->m_data, replacement->m_data);
     if(replacement->m_left != nullptr) {
         replacement->m_parent->m_right = replacement->m_left;
+    } else if(replacement->m_right == m_virtnode) {
+        replacement->m_parent->m_right = m_virtnode;
+        m_virtnode->m_right = replacement->m_parent;
     } else if(replacement->m_right != nullptr) {
         replacement->m_parent->m_left = replacement->m_right;
     } else {
@@ -327,6 +337,7 @@ typename set<T>::iterator set<T>::iterator::operator++() {
             break;
         }
 
+        m_node = par;
         par = par->m_parent;
     }
 

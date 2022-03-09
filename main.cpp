@@ -7,14 +7,21 @@ int main() {
     s.insert(1);
     s.insert(-1);
     s.insert(-2);
-    s.insert(2);
     s.insert(3);
-    s.insert(0);
+    //s.insert(2);
+    s.insert(6);
+    s.insert(4);
+    s.insert(5);
+    //s.remove(2);
     s.print();
     s.print_by_levels();
     std::cout << std::endl;
-    auto i = std::find(s.begin(), s.end(), 2);
+    for (const auto &item : s)
+        std::cout << item << " ";
+    std::cout << std::endl;
+    auto i = std::find(s.begin(), s.end(), 5);
     std::cout << *i << "\n\n";
+    ++i;
 
     auto c = std::count_if(s.begin(), s.end(), [](auto x) { return x % 2 == 0; });
     std::cout << c << "\n\n";
