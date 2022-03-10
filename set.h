@@ -23,8 +23,10 @@ public:
         m_virtnode->m_right = nullptr;
     }
 
-    iterator lower_bound(T &elem);
-    iterator upper_bound(T &elem);
+    set(set &other);
+
+    iterator lower_bound(T &&elem);
+    iterator upper_bound(T &&elem);
     void remove(T elem);
     void insert(T elem);
     void print_by_levels();
@@ -68,6 +70,20 @@ public:
 
     bool operator!=(set<T> &other) {
         return !(*this == other);
+    }
+
+    set<T>& operator=(set other);
+
+    void clear() {
+        free(m_virtnode->m_parent);
+        m_virtnode = (node*)malloc(sizeof(node));
+        m_virtnode->m_parent = nullptr;
+        m_virtnode->m_left = nullptr;
+        m_virtnode->m_right = nullptr;
+    }
+
+    ~set() {
+        free(m_virtnode->m_parent);
     }
 
 public:
@@ -121,6 +137,8 @@ private:
     node* find_rightmost(node *n);
     node *find_leftmost(node *n);
     bool equals(node *n1, node *n2);
+    void free(node *root);
+    void clone(node *dest, node *src);
 
     class node {
     public:
@@ -300,21 +318,172 @@ bool set<T>::equals(set::node *n1, set::node *n2) {
 }
 
 template<class T>
-typename set<T>::iterator set<T>::upper_bound(T &elem) {
-    auto iter = begin();
-    while(iter != end() && *iter <= elem)
-        ++iter;
+typename set<T>::iterator set<T>::upper_bound(T &&elem) {
+    auto root = m_virtnode->m_parent;
+    if(root->m_data == elem)
+        return ++iterator(root, this);
 
-    return iter;
+    if(elem < root->m_data) {
+        while(root != nullptr) {
+            while (elem < root->m_data) {
+                if(root->m_left == nullptr)
+                    return iterator(root, this);
+
+                root = root->m_left;
+            }
+
+            if(elem == root->m_data)
+                return ++iterator(root, this);
+
+            while(elem >= root->m_data) {
+                if(root->m_right == nullptr)
+                    return iterator(root, this);
+
+                root = root->m_right;
+            }
+
+            if(elem == root->m_data)
+                return ++iterator(root, this);
+        }
+    } else {
+        while(root != nullptr) {
+            while (elem >= root->m_data) {
+                if (root->m_right == m_virtnode)
+                    return end();
+
+                if (root->m_right == nullptr)
+                    return iterator(root, this);
+
+                root = root->m_right;
+            }
+
+            if(elem == root->m_data)
+                return ++iterator(root, this);
+
+            while (elem < root->m_data) {
+                if (root->m_left == nullptr)
+                    return iterator(root, this);
+
+                root = root->m_left;
+            }
+
+            if(elem == root->m_data)
+                return ++iterator(root, this);
+        }
+    }
 }
 
 template<class T>
-typename set<T>::iterator set<T>::lower_bound(T &elem) {
-    auto iter = begin();
-    while(iter != end() && *iter < elem)
-        ++iter;
+typename set<T>::iterator set<T>::lower_bound(T &&elem) {
+    auto root = m_virtnode->m_parent;
+    if(root->m_data == elem)
+        return iterator(root, this);
 
-    return iter;
+    if(elem < root->m_data) {
+        while(root != nullptr) {
+            while (elem < root->m_data) {
+                if(root->m_left == nullptr)
+                    return iterator(root, this);
+
+                root = root->m_left;
+            }
+
+            if(elem == root->m_data)
+                return iterator(root, this);
+
+
+            while(elem > root->m_data) {
+                if(root->m_right == nullptr)
+                    return iterator(root, this);
+
+                root = root->m_right;
+            }
+
+            if(elem == root->m_data)
+                return iterator(root, this);
+        }
+    } else {
+        while(root != nullptr) {
+            while (elem > root->m_data) {
+                if (root->m_right == m_virtnode)
+                    return end();
+
+                if (root->m_right == nullptr)
+                    return iterator(root, this);
+
+                root = root->m_right;
+            }
+
+            if (elem == root->m_data)
+                return iterator(root, this);
+
+            while (elem < root->m_data) {
+                if (root->m_left == nullptr)
+                    return iterator(root, this);
+
+                root = root->m_left;
+            }
+
+            if (elem == root->m_data)
+                return iterator(root, this);
+        }
+    }
+}
+
+template<class T>
+void set<T>::free(set::node *root) {
+    if(root->m_left != nullptr)
+        free(root->m_left);
+
+    if(root->m_right == m_virtnode) {
+        delete m_virtnode;
+        root->m_right = nullptr;
+    }
+
+    if(root->m_right != nullptr)
+        free(root->m_right);
+
+    delete root;
+}
+
+template<class T>
+set<T>::set(set &s) {
+    m_virtnode = (node*) malloc(sizeof(node));
+    m_virtnode->m_parent = new node(s.m_virtnode->m_parent->m_data, nullptr);
+    m_virtnode->m_left = m_virtnode->m_right = m_virtnode->m_parent;
+    clone(m_virtnode->m_parent, s.m_virtnode->m_parent);
+}
+
+template<class T>
+void set<T>::clone(node *dest, set::node *src) {
+    if(src->m_left != nullptr) {
+        dest->m_left = new node(src->m_left->m_data, dest);
+        clone(dest->m_left, src->m_left);
+    } else if(dest->m_data < m_virtnode->m_left->m_data) {
+        m_virtnode->m_left = dest;
+    }
+
+    if(src->m_right != nullptr) {
+        if(src->m_right->m_parent != src) {
+            dest->m_right = m_virtnode;
+            m_virtnode->m_right = dest;
+        } else {
+            dest->m_right = new node(src->m_right->m_data, dest);
+            clone(dest->m_right, src->m_right);
+        }
+    }
+}
+
+template<class T>
+set<T> &set<T>::operator=(set other) {
+    if(this == &other)
+        return *this;
+
+    std::swap(other.m_virtnode->m_left, this->m_virtnode->m_left);
+    std::swap(other.m_virtnode->m_right, this->m_virtnode->m_right);
+    std::swap(other.m_virtnode->m_parent, this->m_virtnode->m_parent);
+
+    return *this;
 }
 
 template<class T>
