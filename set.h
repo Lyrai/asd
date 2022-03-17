@@ -13,12 +13,13 @@ private:
     class node;
     node *m_virtnode;
     int m_size;
+    Cmp m_cmp;
 
 public:
     class iterator;
     using size_type = int;
 
-    set() : m_size(0) {
+    set() : m_size(0), m_cmp() {
         m_virtnode = (node*)malloc(sizeof(node));
         m_virtnode->parent() = nullptr;
         m_virtnode->left() = nullptr;
@@ -94,6 +95,7 @@ public:
         m_virtnode->parent() = nullptr;
         m_virtnode->left() = nullptr;
         m_virtnode->right() = nullptr;
+        m_size = 0;
     }
 
     ~set() {
@@ -113,6 +115,8 @@ public:
         iterator(node *n, set *s)
             : m_node(n), m_set(s)
         { }
+
+        iterator(): m_node(nullptr), m_set(nullptr) { }
 
         iterator(iterator &iter)
             : m_node(iter.m_node), m_set(iter.m_set)
@@ -224,7 +228,6 @@ private:
             signed char hr = right() ? right()->m_height : -1;
 
             m_height = (hl > hr ? hl : hr) + 1;
-            printf("fixing %d; hl(%d) = %d; hr(%d) = %d\n", m_data, left() ? left()->m_data : 0, hl, right() ? right()->m_data : 0, hr);
         }
 
         void rotate_right();
@@ -238,7 +241,6 @@ template<class T, class Cmp>
 void set<T, Cmp>::insert(T elem) {
     if(m_virtnode->parent() == nullptr) {
         m_virtnode->left() = m_virtnode->right() = m_virtnode->parent() = new node(elem, m_virtnode);
-        //m_virtnode->parent_right() = m_virtnode;
     } else {
         insert(elem, m_virtnode->parent());
     }
@@ -248,10 +250,12 @@ void set<T, Cmp>::insert(T elem) {
 
 template<class T, class Cmp>
 void set<T, Cmp>::insert(T elem, set::node *root) {
-    if(elem == root->m_data)
+    if(!m_cmp(elem, root->m_data) && !m_cmp(root->m_data, elem)) {
+        --m_size;
         return;
+    }
 
-    if(elem < root->m_data) {
+    if(m_cmp(elem, root->m_data)) {
         if(root->left() == nullptr) {
             root->left() = new node(elem, root);
             if(root == m_virtnode->left())
@@ -269,13 +273,6 @@ void set<T, Cmp>::insert(T elem, set::node *root) {
             }
         }
     } else {
-        /*if(root->right() == m_virtnode) {
-            auto new_node = new node(elem, root);
-            root->right() = new_node;
-            m_virtnode->right() = new_node;
-            new_node->right() = m_virtnode;
-            root->fix_height();
-        } else*/
         if(root->right() == nullptr) {
             auto new_node = new node(elem, root);
             root->right() = new_node;
@@ -298,10 +295,10 @@ void set<T, Cmp>::insert(T elem, set::node *root) {
 
 template<class T, class Cmp>
 typename set<T, Cmp>::node* set<T, Cmp>::find(T &elem, node *root) {
-    if(elem == root->m_data)
+    if(!m_cmp(elem, root->m_data) && !m_cmp(root->m_data, elem))
         return root;
 
-    if(elem < root->m_data) {
+    if(m_cmp(elem, root->m_data)) {
         if(root->left() == nullptr) {
             return nullptr;
         } else {
@@ -412,7 +409,7 @@ bool set<T, Cmp>::equals(set::node *n1, set::node *n2) {
     if(n1 == nullptr || n2 == nullptr)
         return false;
 
-    if(n1->m_data == n2->m_data) {
+    if(!m_cmp(n1->m_data, n2->m_data) && !m_cmp(n2->m_data, n1->m_data)) {
         return equals(n1->left(), n2->left()) && equals(n1->right(), n2->right());
     } else {
         return false;
@@ -422,10 +419,10 @@ bool set<T, Cmp>::equals(set::node *n1, set::node *n2) {
 template<class T, class Cmp>
 typename set<T, Cmp>::iterator set<T, Cmp>::upper_bound(T &&elem) {
     auto root = m_virtnode->parent();
-    if(root->m_data == elem)
+    if(!m_cmp(elem, root->m_data) && !m_cmp(root->m_data, elem))
         return ++iterator(root, this);
 
-    if(elem < root->m_data) {
+    if(m_cmp(elem, root->m_data)) {
         while(root != nullptr) {
             while (elem < root->m_data) {
                 if(root->left() == nullptr)
@@ -434,22 +431,22 @@ typename set<T, Cmp>::iterator set<T, Cmp>::upper_bound(T &&elem) {
                 root = root->left();
             }
 
-            if(elem == root->m_data)
+            if(!m_cmp(elem, root->m_data) && !m_cmp(root->m_data, elem))
                 return ++iterator(root, this);
 
-            while(elem >= root->m_data) {
+            while(!m_cmp(elem, root->m_data)) {
                 if(root->right() == nullptr)
                     return iterator(root, this);
 
                 root = root->right();
             }
 
-            if(elem == root->m_data)
+            if(!m_cmp(elem, root->m_data) && !m_cmp(root->m_data, elem))
                 return ++iterator(root, this);
         }
     } else {
         while(root != nullptr) {
-            while (elem >= root->m_data) {
+            while (!m_cmp(elem, root->m_data)) {
                 if (root->right() == m_virtnode)
                     return end();
 
@@ -459,17 +456,17 @@ typename set<T, Cmp>::iterator set<T, Cmp>::upper_bound(T &&elem) {
                 root = root->right();
             }
 
-            if(elem == root->m_data)
+            if(!m_cmp(elem, root->m_data) && !m_cmp(root->m_data, elem))
                 return ++iterator(root, this);
 
-            while (elem < root->m_data) {
+            while (m_cmp(elem, root->m_data)) {
                 if (root->left() == nullptr)
                     return iterator(root, this);
 
                 root = root->left();
             }
 
-            if(elem == root->m_data)
+            if(!m_cmp(elem, root->m_data) && !m_cmp(root->m_data, elem))
                 return ++iterator(root, this);
         }
     }
@@ -478,35 +475,35 @@ typename set<T, Cmp>::iterator set<T, Cmp>::upper_bound(T &&elem) {
 template<class T, class Cmp>
 typename set<T, Cmp>::iterator set<T, Cmp>::lower_bound(T &&elem) {
     auto root = m_virtnode->parent();
-    if(root->m_data == elem)
+    if(!m_cmp(elem, root->m_data) && !m_cmp(root->m_data, elem))
         return iterator(root, this);
 
-    if(elem < root->m_data) {
+    if(m_cmp(elem, root->m_data)) {
         while(root != nullptr) {
-            while (elem < root->m_data) {
+            while (m_cmp(elem, root->m_data)) {
                 if(root->left() == nullptr)
                     return iterator(root, this);
 
                 root = root->left();
             }
 
-            if(elem == root->m_data)
+            if(!m_cmp(elem, root->m_data) && !m_cmp(root->m_data, elem))
                 return iterator(root, this);
 
 
-            while(elem > root->m_data) {
+            while(m_cmp(root->m_data, elem)) {
                 if(root->right() == nullptr)
                     return iterator(root, this);
 
                 root = root->right();
             }
 
-            if(elem == root->m_data)
+            if(!m_cmp(elem, root->m_data) && !m_cmp(root->m_data, elem))
                 return iterator(root, this);
         }
     } else {
         while(root != nullptr) {
-            while (elem > root->m_data) {
+            while (m_cmp(root->m_data, elem)) {
                 if (root->right() == m_virtnode)
                     return end();
 
@@ -516,17 +513,17 @@ typename set<T, Cmp>::iterator set<T, Cmp>::lower_bound(T &&elem) {
                 root = root->right();
             }
 
-            if (elem == root->m_data)
+            if (!m_cmp(elem, root->m_data) && !m_cmp(root->m_data, elem))
                 return iterator(root, this);
 
-            while (elem < root->m_data) {
+            while (m_cmp(elem, root->m_data)) {
                 if (root->left() == nullptr)
                     return iterator(root, this);
 
                 root = root->left();
             }
 
-            if (elem == root->m_data)
+            if (!m_cmp(elem, root->m_data) && !m_cmp(root->m_data, elem))
                 return iterator(root, this);
         }
     }
@@ -553,6 +550,7 @@ void set<T, Cmp>::free(set::node *root) {
 
 template<class T, class Cmp>
 set<T, Cmp>::set(const set &s): m_size(s.m_size) {
+    m_cmp = Cmp();
     m_virtnode = (node*) malloc(sizeof(node));
     if(s.m_virtnode->parent() == nullptr) {
         m_virtnode->parent() = m_virtnode->left() = m_virtnode->right() = nullptr;
@@ -593,6 +591,7 @@ set<T, Cmp> &set<T, Cmp>::operator=(const set &other) {
     std::swap(s.m_virtnode->left(), this->m_virtnode->left());
     std::swap(s.m_virtnode->right(), this->m_virtnode->right());
     std::swap(s.m_virtnode->parent(), this->m_virtnode->parent());
+    m_size = s.m_size;
 
     return *this;
 }
@@ -651,7 +650,7 @@ typename set<T, Cmp>::iterator set<T, Cmp>::iterator::operator--() {
 
     auto par = m_node->parent();
     while(par->right() != m_node) {
-        if(par->parent()->parent() == this) {
+        if(par->parent()->parent() == par) {
             par = par->left();
             break;
         }
@@ -665,7 +664,6 @@ typename set<T, Cmp>::iterator set<T, Cmp>::iterator::operator--() {
 
 template<class T, class Cmp>
 void set<T, Cmp>::node::rotate_right() {
-    std::cout << "rotate right " << m_data << "\n";
     auto q = left();
 
     if(parent()->parent() == this) {
@@ -687,7 +685,6 @@ void set<T, Cmp>::node::rotate_right() {
 
 template<class T, class Cmp>
 void set<T, Cmp>::node::rotate_left() {
-    std::cout << "rotate left " << m_data << std::endl;
     auto r = right();
 
     if(parent()->parent() == this) {
@@ -709,14 +706,12 @@ void set<T, Cmp>::node::rotate_left() {
 
 template<class T, class Cmp>
 void set<T, Cmp>::node::big_rotate_right() {
-    std::cout << "big rotate right\n";
     left()->rotate_left();
     rotate_right();
 }
 
 template<class T, class Cmp>
 void set<T, Cmp>::node::big_rotate_left() {
-    std::cout << "big rotate left\n";
     right()->rotate_right();
     rotate_left();
 }

@@ -29,7 +29,7 @@ int main() {
     for (const auto &item : s)
         std::cout << item << " ";
     std::cout << std::endl;
-    /*for (const auto &item : s)
+    for (const auto &item : s)
         std::cout << item << " ";
     std::cout << std::endl;
     auto i = std::find(s.begin(), s.end(), 5);
